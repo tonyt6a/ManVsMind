@@ -56,33 +56,10 @@ def detect_blinks_and_jaw_clench(eegdf):
 
     if previous_rise is not None and rise > (previous_rise + 6):
         current_time = time.time()
-        print("Blink detected")
-        if last_blink_time is None:
-            last_blink_time = current_time
-            blink_count = 1
-        else:
-            time_diff = current_time - last_blink_time
-            if time_diff <= double_blink_time_threshold:
-                blink_count += 1
-            else:
-                blink_count = 1
-            last_blink_time = current_time
-
-        if blink_count == 1:
-            single_blink_detected = True
-        elif blink_count == 2:
-            print("Double blink detected")
-            blink_count = 0
-            print("Shoot")
-
-        if single_blink_detected:
-            print("turn1" if turn_direction else "turn2")
-            turn_direction = not turn_direction
-            single_blink_detected = False
+        print("Blink detected, JUMP")
 
     if rise > 100 and drop < -150:
-        print("Jaw clench detected")
-        print("Move Forward")
+        print("Jaw clench detected, ATTACK")
     previous_rise = rise
 
 
@@ -160,7 +137,7 @@ def update_plot(i):
         detect_blinks_and_jaw_clench(eegdf)
 
         # Call the accelerometer data function
-        get_accelerometer_data()
+        # get_accelerometer_data()
 
         # Update each subplot with its corresponding EEG channel data
         axs[0].cla()
