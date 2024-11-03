@@ -1,6 +1,9 @@
 import arcade
-import threading
-import time
+from multiprocessing import Queue
+from queue import Empty  
+import pandas as pd
+import numpy as np
+import serial
 
 SCREEN_WIDTH = 1500
 SCREEN_HEIGHT = 600
@@ -18,32 +21,85 @@ PLAYER_MOVEMENT_SPEED = 800
 PLAYER_MOVE_FORCE_ON_GROUND = 8000
 
 #how many of each state
-amount_of_images = {"idle": 4}
+amount_of_images = {"idle": 4, "attack":6, "jump":4}
+
+arduino = serial.Serial(port='COM4', baudrate=115200, timeout=1)
+
+global serialPort
+serialPort = serial.Serial('COM1', 115200)  # Match the port with the virtual port pair
 
 
 class PlayerSprite(arcade.Sprite): 
     def __init__(self, character): #takes input as which character (biker/punk)
-        super().__init__()
+        super().__init__(scale=1, hit_box_algorithm="Detailed")
         self.state_number = 0
+        self.facing_actual = 0 #what it's actually facing
         self.state = "idle"
         self.scale = CHARACTER_SCALING
-
+        self.facing_direction = 0 # 1 for right 0 for left
+        self.health = 100
+        self._hit_box_algorithm = "Detailed"
         path = f"images/{character}"
 
+
+        #idle animation
         self.idle_textures = []
         for i in range(1, amount_of_images["idle"] + 1):
             # print(f"{path}/Idle/image{i}x1.png")
-            texture = arcade.load_texture_pair(f"{path}/Idle/image{i}x1.png")
+            texture = arcade.load_texture_pair(f"{path}/Idle/image{i}x1.png", hit_box_algorithm="Detailed")
             self.idle_textures.append(texture)
+        
+        
+        # attack animation
+        self.attack_textures = []
+        for i in range(1, amount_of_images["attack"] + 1):
+            # print(f"{path}/Attack1/image{i}x1.png")
+            texture = arcade.load_texture_pair(f"{path}/Attack1/image{i}x1.png", hit_box_algorithm="Detailed")
+            self.attack_textures.append(texture)
+        
 
+
+        # jump animation
+        self.jump_textures = []
+        for i in range(1, amount_of_images["jump"] + 1):
+            # print(f"{path}/Jump/image{i}x1.png")
+            texture = arcade.load_texture_pair(f"{path}/Jump/image{i}x1.png", hit_box_algorithm="Detailed")
+            self.jump_textures.append(texture)
+        
         self.texture = self.idle_textures[0][0]
+        self._hit_box_detail = 1
+        self.texture._hit_box_detail = 1
+        
+    def check_face_direction(self, other_player:arcade.Sprite = None):
+        if other_player.center_x > self.center_x:
+            self.facing_direction = 1
+        elif other_player.center_x < self.center_x:
+            self.facing_direction = 0
+
+
+class GameOverView(arcade.View):
+    """ Class to manage the game over view """
+    def on_show_view(self):
+        """ Called when switching to this view"""
+        arcade.set_background_color(arcade.color.BLACK)
+
+    def on_draw(self):
+        """ Draw the game over view """
+        self.clear()
+        arcade.draw_text("Game Over - press ESCAPE to advance", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
+                         arcade.color.WHITE, 30, anchor_x="center")
+
+    def on_key_press(self, key, _modifiers):
+        """ If user hits escape, go back to the main menu view """
+        if key == arcade.key.ESCAPE:
+            exit()
 
 
 class MyGame(arcade.Window):
     """
     Main application class.
     """
-
+    
     def __init__(self, width, height, title):
         super().__init__(width, height, title)
 
@@ -63,10 +119,6 @@ class MyGame(arcade.Window):
 
         # A Camera that can be used to draw GUI elements
         self.gui_camera = None
-
-        # Player health
-        self.player1_health = 100
-        self.player2_health = 100
 
         # Our physics engine
         # Create the physics engine
@@ -93,7 +145,6 @@ class MyGame(arcade.Window):
         self.scene.add_sprite_list("Player 2")
         self.scene.add_sprite_list("Walls", use_spatial_hash=True)
         # Initialize first player
-        image_source = "images/testSprite.png"
         self.player_sprite1 = PlayerSprite("Biker")
         # self.player_sprite1 = arcade.Sprite(image_source, CHARACTER_SCALING)
         self.player_sprite1.center_x = 1000
@@ -107,6 +158,7 @@ class MyGame(arcade.Window):
                                        moment=arcade.PymunkPhysicsEngine.MOMENT_INF,
                                        max_horizontal_velocity=PLAYER_MOVEMENT_SPEED,
                                        max_vertical_velocity=PLAYER_JUMP_SPEED)
+        
         # Initialize second player
         # self.player_sprite2 = arcade.Sprite(image_source, CHARACTER_SCALING)
         self.player_sprite2 = PlayerSprite("Biker")
@@ -114,6 +166,7 @@ class MyGame(arcade.Window):
         self.player_sprite2.center_y = 150
         self.player_sprite2.width = 192
         self.player_sprite2.height = 192
+        self.player_sprite2.facing_direction = 1
         self.scene.add_sprite("Player 2", self.player_sprite2)
         self.physics_engine.add_sprite(self.player_sprite2,
                                        elasticity=0,
@@ -121,6 +174,8 @@ class MyGame(arcade.Window):
                                        moment=arcade.PymunkPhysicsEngine.MOMENT_INF,
                                        max_horizontal_velocity=PLAYER_MOVEMENT_SPEED,
                                        max_vertical_velocity=PLAYER_JUMP_SPEED)
+
+        self.player_sprite2.texture = self.player_sprite2.idle_textures[0][1]
 
         # Create the ground
         # This shows using a loop to place multiple sprites horizontally
@@ -136,6 +191,7 @@ class MyGame(arcade.Window):
         self.physics_engine.add_sprite_list(self.wall_list,
                                     collision_type="wall",
                                     body_type=arcade.PymunkPhysicsEngine.STATIC)
+        self.physics_engine.debug_draw_options = True
         
     def on_draw(self):
         """
@@ -156,28 +212,45 @@ class MyGame(arcade.Window):
         # Activate the GUI camera before drawing GUI elements
         self.gui_camera.use()
 
+        self.player_sprite1.draw_hit_box()
+        self.player_sprite2.draw_hit_box()
+
+        
 
 
     def on_key_press(self, key, modifiers):
         """Called whenever a key is pressed."""
+        # player2 (UnoController), player1 (BCI)
 
-        if key == arcade.key.UP:
+        if key == arcade.key.UP: # player 1 jump
             if self.physics_engine.is_on_ground(self.player_sprite1):
                 self.physics_engine.set_vertical_velocity(self.player_sprite1, PLAYER_JUMP_SPEED)
-        if key == arcade.key.W:
+                self.player_sprite1.state = "jump"
+
+        if key == arcade.key.W: # player 2 jump
             if self.physics_engine.is_on_ground(self.player_sprite2):
                 self.physics_engine.set_vertical_velocity(self.player_sprite2, PLAYER_JUMP_SPEED)
-        if key == arcade.key.DOWN:
-            self.player_sprite1.change_y = -PLAYER_MOVEMENT_SPEED
-        if  key == arcade.key.S:
-            self.player_sprite2.change_y = -PLAYER_MOVEMENT_SPEED
-        if key == arcade.key.LEFT:
+                self.player_sprite2.state = "jump"
+                
+        if key == arcade.key.DOWN : # player 1 attack
+            if self.player_sprite1.collides_with_sprite(self.player_sprite2):
+                self.player_sprite2.health -= 10
+            self.player_sprite1.state = "attack"
+            self.player_sprite1.state_number = 0
+        if  key == arcade.key.S: #player 2 attack
+            if self.player_sprite2.collides_with_sprite(self.player_sprite1):
+                self.player_sprite1.health -= 10
+            self.player_sprite2.state = "attack"
+            self.player_sprite2.state_number = 0
+
+        if key == arcade.key.LEFT: # player 1 left movement
             self.physics_engine.set_horizontal_velocity(self.player_sprite1, -PLAYER_MOVEMENT_SPEED)
-        if key == arcade.key.A:
+        if key == arcade.key.A: # player 2 left movement
             self.physics_engine.set_horizontal_velocity(self.player_sprite2, -PLAYER_MOVEMENT_SPEED)
-        if key == arcade.key.RIGHT:
+
+        if key == arcade.key.RIGHT: # player 1 right movement
             self.physics_engine.set_horizontal_velocity(self.player_sprite1, PLAYER_MOVEMENT_SPEED)
-        if key == arcade.key.D:
+        if key == arcade.key.D: # player 2 right movement
             self.physics_engine.set_horizontal_velocity(self.player_sprite2, PLAYER_MOVEMENT_SPEED)
 
     def on_key_release(self, key, modifiers):
@@ -191,6 +264,7 @@ class MyGame(arcade.Window):
             self.player_sprite1.change_y = 0
         if  key == arcade.key.S:
             self.player_sprite2.change_y = 0
+            
         if key == arcade.key.LEFT:
             self.physics_engine.set_horizontal_velocity(self.player_sprite1, 0)
         if key == arcade.key.A:
@@ -202,29 +276,105 @@ class MyGame(arcade.Window):
 
     def on_update(self, delta_time):
         """Movement and game logic"""
+        if arduino.in_waiting > 0:  # Check if there is data available to read
+            line = arduino.readline().decode('utf-8').strip()  # Read the line and decode it
 
+            if serialPort.read('BCI_JUMP'): # player 1 jump
+                    if self.physics_engine.is_on_ground(self.player_sprite1):
+                        self.physics_engine.set_vertical_velocity(self.player_sprite1, PLAYER_JUMP_SPEED)
+
+            if line == 'JUMP': # player 2 jump
+                if self.physics_engine.is_on_ground(self.player_sprite2):
+                    self.physics_engine.set_vertical_velocity(self.player_sprite2, PLAYER_JUMP_SPEED)
+                        
+            if serialPort.read('BCI_ATTACK'): # player 1 attack
+                if self.player_sprite1.collides_with_sprite(self.player_sprite2):
+                    self.player_sprite2.health -= 10
+                self.player_sprite1.state = "ATTACK"
+                self.player_sprite1.state_number = 0
+
+            if line == 'ATTACK': #player 2 attack
+                if self.player_sprite2.collides_with_sprite(self.player_sprite1):
+                    self.player_sprite1.health -= 10
+                self.player_sprite2.state = "attack"
+                self.player_sprite2.state_number = 0
+
+                
+            if line == 'LEFT': # player 2 left movement
+                self.physics_engine.set_horizontal_velocity(self.player_sprite2, -PLAYER_MOVEMENT_SPEED)
+
+            if line == 'RIGHT': # player 2 right movement
+                self.physics_engine.set_horizontal_velocity(self.player_sprite2, PLAYER_MOVEMENT_SPEED)
 
         # Move the player with the physics engine
         self.physics_engine.step()
 
+        self.player_sprite1.check_face_direction(self.player_sprite2)
+        self.player_sprite1.set_hit_box(self.player_sprite1.texture.hit_box_points)
+        self.player_sprite2.check_face_direction(self.player_sprite1)
+        self.player_sprite2.set_hit_box(self.player_sprite2.texture.hit_box_points)
         self.update_animation()
+
+        if self.player_sprite1.health <= 0:
+            window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, "Different Views Minimal Example")
+            window.show_view(GameOverView())
+        elif self.player_sprite1.health <= 0:
+            window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, "Different Views Minimal Example")
+            window.show_view(GameOverView())
+
+        # print("player 1:: ", self.player_sprite1.texture.hit_box_points)
+        # print("player 2:: ", self.player_sprite2.texture.hit_box_points)
 
     def update_animation(self, delta_time: float = 1 / 5):
             # print(self.player_sprite1.state_number)
-            #check for player 1
+            # check for player 1
             if(self.player_sprite1.state == "idle"):
                 #4 * 7
                 if(self.player_sprite1.state_number >= 28):
                     self.player_sprite1.state_number = 0
                 self.player_sprite1.texture = self.player_sprite1.idle_textures[int(self.player_sprite1.state_number / 7)][0]
                 self.player_sprite1.state_number += 1
+            if(self.player_sprite2.state == "idle"):
+                if(self.player_sprite2.state_number >= 28):
+                    self.player_sprite2.state_number = 0
+                self.player_sprite2.texture = self.player_sprite2.idle_textures[int(self.player_sprite2.state_number / 7)][1 - self.player_sprite2.facing_direction]
+                self.player_sprite2.state_number += 1
+            if(self.player_sprite1.state == "attack"):
+                if(self.player_sprite1.state_number >= 18):
+                    self.player_sprite1.state_number = 0
+                    self.player_sprite1.state = "idle"
+                else:
+                    self.player_sprite1.texture = self.player_sprite1.attack_textures[int(self.player_sprite1.state_number / 3)][0]
+                    self.player_sprite1.state_number += 1
+            if(self.player_sprite2.state == "attack"):
+                if(self.player_sprite2.state_number >= 18):
+                    self.player_sprite2.state_number = 0
+                    self.player_sprite2.state = "idle"
+                else:
+                    self.player_sprite2.texture = self.player_sprite2.attack_textures[int(self.player_sprite2.state_number / 3)][1 - self.player_sprite2.facing_direction]
+                    self.player_sprite2.state_number += 1
+            if(self.player_sprite1.state == "jump"):
+                if(self.player_sprite1.state_number):
+                    self.player_sprite1.texture = self.player_sprite1.jump_textures[1][1 - self.player_sprite2.facing_direction]
+                if(self.physics_engine.is_on_ground(self.player_sprite1)):
+                    self.player_sprite1.state = "idle"
+            if(self.player_sprite2.state == "jump"):
+                if(self.player_sprite2.state_number):
+                    self.player_sprite2.texture = self.player_sprite2.jump_textures[1][1 - self.player_sprite2.facing_direction]
+                if(self.physics_engine.is_on_ground(self.player_sprite2)):
+                    self.player_sprite2.state = "idle"
+                         
 
-def main():
+def main(data_queue: Queue):
     """ Main function """
+    global queue
+    queue = data_queue
     window = MyGame(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
     window.setup()
     arcade.run()
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+# main()
+arduino.close()
+serialPort.close()
