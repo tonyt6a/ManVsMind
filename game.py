@@ -1,6 +1,6 @@
 import random
 import arcade
-# from multiprocessing import Queue
+from multiprocessing import Process, Array, Lock
 
 # import pandas as pd
 # import numpy as np
@@ -28,6 +28,9 @@ attack_frame = [3, 7, 12, 17, 25, 30] # how many ticks should the program stay i
 attack_frame = [num // 3 for num in attack_frame]
 ATTACK_FRAME = attack_frame[3] + 1 # which frame the attack frame should read as
 TOTAL_ATTACK_FRAME = attack_frame[-1]
+
+arr = None
+lock = None
 
 hurt_frame = [4, 10]
 
@@ -504,16 +507,12 @@ def find_index(frames, value):
         if(frames[i] > value):
             return i
 
-# def main(data_queue):
-#     """ Main function """
-#     queue = data_queue
-window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
-main_window = MyGame()
-main_window.setup()
-window.show_view(main_window)
-# window.setup()
-arcade.run()
-
-
-# # if __name__ == "__main__":
-# main(queue: Queue)
+def main(data_arr: Array, data_lock: Lock):
+    """ Main function """
+    arr = data_arr
+    lock = data_lock
+    window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+    main_window = MyGame()
+    main_window.setup()
+    window.show_view(main_window)
+    arcade.run()
