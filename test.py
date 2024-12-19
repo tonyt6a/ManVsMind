@@ -443,12 +443,8 @@ class MyGame(arcade.View):
                     self.player_sprite1.state_number = 0
                 self.player_sprite1.texture = self.player_sprite1.idle_textures[int(self.player_sprite1.state_number / 7)][self.player_sprite2.facing_direction]
                 self.player_sprite1.state_number += 1
-            if(self.player_sprite2.state == "idle"):
-                if(self.player_sprite2.state_number >= 28):
-                    self.player_sprite2.state_number = 0
-                self.player_sprite2.texture = self.player_sprite2.idle_textures[int(self.player_sprite2.state_number / 7)][1 - self.player_sprite2.facing_direction]
-                self.player_sprite2.state_number += 1
-            if(self.player_sprite1.state == "attack"):
+            
+            elif(self.player_sprite1.state == "attack"):
                 if(self.player_sprite1.state_number >= TOTAL_ATTACK_FRAME):
                     self.player_sprite1.state_number = 0
                     self.player_sprite1.state = "idle"
@@ -457,7 +453,29 @@ class MyGame(arcade.View):
                     # self.player_sprite1.texture = self.player_sprite1.(attack_textures if self.player_sprite1.attack_state == 0 else )[find_attack_index1][self.player_sprite2.facing_direction]
                     self.player_sprite1.texture = (self.player_sprite1.attack_textures[find_attack_index1][self.player_sprite2.facing_direction] if self.player_sprite1.attack_state == 0 else self.player_sprite1.attack2_textures[find_attack_index1][self.player_sprite2.facing_direction])
                     self.player_sprite1.state_number += 1
-            if(self.player_sprite2.state == "attack"):
+
+            elif(self.player_sprite1.state == "jump"):
+                # if(self.player_sprite1.state_number):
+                self.player_sprite1.texture = self.player_sprite1.jump_textures[1][1 - self.player_sprite1.facing_direction]
+                if(self.physics_engine.is_on_ground(self.player_sprite1)):
+                    self.player_sprite1.state = "idle"
+
+            elif(self.player_sprite1.state == "hurt"):
+                if(self.player_sprite1.state_number == hurt_frame[-1]):
+                    self.player_sprite1.state = "idle"
+                    self.player_sprite1.state_number = 0
+                else:
+                    find_hurt_index1 = find_index(hurt_frame, self.player_sprite1.state_number)
+                    self.player_sprite1.texture = (self.player_sprite1.hurt_textures[find_hurt_index1][self.player_sprite2.facing_direction])
+                    self.player_sprite1.state_number += 1
+            
+            if(self.player_sprite2.state == "idle"):
+                if(self.player_sprite2.state_number >= 28):
+                    self.player_sprite2.state_number = 0
+                self.player_sprite2.texture = self.player_sprite2.idle_textures[int(self.player_sprite2.state_number / 7)][1 - self.player_sprite2.facing_direction]
+                self.player_sprite2.state_number += 1
+            
+            elif(self.player_sprite2.state == "attack"):
                 if(self.player_sprite2.state_number >= TOTAL_ATTACK_FRAME):
                     self.player_sprite2.state_number = 0
                     self.player_sprite2.state = "idle"
@@ -466,27 +484,16 @@ class MyGame(arcade.View):
                     # self.player_sprite2.texture = self.player_sprite2.attack_textures[find_attack_index2][1 - self.player_sprite2.facing_direction]
                     self.player_sprite2.texture = (self.player_sprite2.attack_textures[find_attack_index2][self.player_sprite1.facing_direction] if self.player_sprite2.attack_state == 0 else self.player_sprite2.attack2_textures[find_attack_index2][self.player_sprite1.facing_direction])
                     self.player_sprite2.state_number += 1
-            if(self.player_sprite1.state == "jump"):
-                # if(self.player_sprite1.state_number):
-                self.player_sprite1.texture = self.player_sprite1.jump_textures[1][1 - self.player_sprite1.facing_direction]
-                if(self.physics_engine.is_on_ground(self.player_sprite1)):
-                    self.player_sprite1.state = "idle"
-            if(self.player_sprite2.state == "jump"):
+            
+            elif(self.player_sprite2.state == "jump"):
                 # if(self.player_sprite2.state_number):
                 self.player_sprite2.texture = self.player_sprite2.jump_textures[1][1 - self.player_sprite2.facing_direction]
                 if(self.physics_engine.is_on_ground(self.player_sprite2)):
                     self.player_sprite2.state = "idle"
 
-            if(self.player_sprite1.state == "hurt"):
-                if(self.player_sprite1.state_number == hurt_frame[-1]):
-                    self.player_sprite1.state = "idle"
-                    self.player_sprite1.state_number = 0
-                else:
-                    find_hurt_index1 = find_index(hurt_frame, self.player_sprite1.state_number)
-                    self.player_sprite1.texture = (self.player_sprite1.hurt_textures[find_hurt_index1][self.player_sprite2.facing_direction])
-                    self.player_sprite1.state_number += 1
+            
 
-            if(self.player_sprite2.state == "hurt"):
+            elif(self.player_sprite2.state == "hurt"):
                 if(self.player_sprite2.state_number == hurt_frame[-1]):
                     self.player_sprite2.state = "idle"
                     self.player_sprite2.state_number = 0
