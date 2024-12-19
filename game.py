@@ -24,7 +24,8 @@ PLAYER_MOVE_FORCE_ON_GROUND = 8000
 #how many of each state
 amount_of_images = {"idle": 4, "attack":6, "jump":4}
 # 6 6 5 3 2 2
-attack_frame = [3, 7, 12, 17, 25, 30] #how many ticks should the program stay in each frame
+attack_frame = [3, 7, 12, 17, 25, 30] # how many ticks should the program stay in each frame
+attack_frame = [num // 3 for num in attack_frame]
 ATTACK_FRAME = attack_frame[3] + 1 # which frame the attack frame should read as
 TOTAL_ATTACK_FRAME = attack_frame[-1]
 
@@ -272,149 +273,6 @@ class MyGame(arcade.View):
         self.draw_health_bar(self.player_sprite2, x=100, y=self.height - 50, width=200, height=20)  # Top left for player 1
         self.draw_health_bar(self.player_sprite1, x=self.width - 100, y=self.height - 50, width=200, height=20)  # Top right for player 2
 
-        if key == arcade.key.UP: # player 1 jump
-            if self.physics_engine.is_on_ground(self.player_sprite1):
-                self.physics_engine.set_vertical_velocity(self.player_sprite1, PLAYER_JUMP_SPEED)
-                self.player_sprite1.state = "jump"
-
-        if key == arcade.key.W: # player 2 jump
-            if self.physics_engine.is_on_ground(self.player_sprite2):
-                self.physics_engine.set_vertical_velocity(self.player_sprite2, PLAYER_JUMP_SPEED)
-                self.player_sprite2.state = "jump"
-                
-        if key == arcade.key.DOWN : # player 1 attack
-            if self.player_sprite1.collides_with_sprite(self.player_sprite2):
-                self.player_sprite2.health -= 10
-            self.player_sprite1.state = "attack"
-            self.player_sprite1.state_number = 0
-        if  key == arcade.key.S: #player 2 attack
-            if self.player_sprite2.collides_with_sprite(self.player_sprite1):
-                self.player_sprite1.health -= 10
-            self.player_sprite2.state = "attack"
-            self.player_sprite2.state_number = 0
-
-        if key == arcade.key.LEFT: # player 1 left movement
-            self.physics_engine.set_horizontal_velocity(self.player_sprite1, -PLAYER_MOVEMENT_SPEED)
-        if key == arcade.key.A: # player 2 left movement
-            self.physics_engine.set_horizontal_velocity(self.player_sprite2, -PLAYER_MOVEMENT_SPEED)
-
-        if key == arcade.key.RIGHT: # player 1 right movement
-            self.physics_engine.set_horizontal_velocity(self.player_sprite1, PLAYER_MOVEMENT_SPEED)
-        if key == arcade.key.D: # player 2 right movement
-            self.physics_engine.set_horizontal_velocity(self.player_sprite2, PLAYER_MOVEMENT_SPEED)
-
-    def on_key_release(self, key, modifiers):
-        """Called when the user releases a key."""
-
-        if key == arcade.key.UP:
-            self.player_sprite1.change_y = 0
-        if key == arcade.key.W:
-            self.player_sprite2.change_y = 0
-        if key == arcade.key.DOWN:
-            self.player_sprite1.change_y = 0
-        if  key == arcade.key.S:
-            self.player_sprite2.change_y = 0
-            
-        if key == arcade.key.LEFT:
-            self.physics_engine.set_horizontal_velocity(self.player_sprite1, 0)
-        if key == arcade.key.A:
-            self.physics_engine.set_horizontal_velocity(self.player_sprite2, 0)
-        if key == arcade.key.RIGHT:
-            self.physics_engine.set_horizontal_velocity(self.player_sprite1, 0)
-        if key == arcade.key.D:
-            self.physics_engine.set_horizontal_velocity(self.player_sprite2, 0)
-
-    def on_update(self, delta_time):
-        """Movement and game logic"""
-        if arduino.in_waiting > 0:  # Check if there is data available to read
-            line = arduino.readline().decode('utf-8', errors='ignore').strip()  # Read the line and decode it
-
-            # if serialPort.read('BCI_JUMP'): # player 1 jump
-            #         if self.physics_engine.is_on_ground(self.player_sprite1):
-            #             self.physics_engine.set_vertical_velocity(self.player_sprite1, PLAYER_JUMP_SPEED)
-
-            if line == 'JUMP': # player 2 jump
-                if self.physics_engine.is_on_ground(self.player_sprite2):
-                    self.physics_engine.set_vertical_velocity(self.player_sprite2, PLAYER_JUMP_SPEED)
-                        
-            # if serialPort.read('BCI_ATTACK'): # player 1 attack
-            #     if self.player_sprite1.collides_with_sprite(self.player_sprite2):
-            #         self.player_sprite2.health -= 10
-            #     self.player_sprite1.state = "ATTACK"
-            #     self.player_sprite1.state_number = 0
-
-            if line == 'ATTACK': #player 2 attack
-                if self.player_sprite2.collides_with_sprite(self.player_sprite1):
-                    self.player_sprite1.health -= 10
-                self.player_sprite2.state = "attack"
-                self.player_sprite2.state_number = 0
-
-                
-            if line == 'LEFT': # player 2 left movement
-                self.physics_engine.set_horizontal_velocity(self.player_sprite2, -PLAYER_MOVEMENT_SPEED)
-            elif line == 'RIGHT': # player 2 right movement
-                self.physics_engine.set_horizontal_velocity(self.player_sprite2, PLAYER_MOVEMENT_SPEED)
-            elif line == 'STOP':    
-                self.physics_engine.set_horizontal_velocity(self.player_sprite2, 0)
-
-        # Move the player with the physics engine
-        self.physics_engine.step()
-
-        self.player_sprite1.check_face_direction(self.player_sprite2)
-        self.player_sprite1.set_hit_box(self.player_sprite1.texture.hit_box_points)
-        self.player_sprite2.check_face_direction(self.player_sprite1)
-        self.player_sprite2.set_hit_box(self.player_sprite2.texture.hit_box_points)
-        self.update_animation()
-
-        if self.player_sprite1.health <= 0:
-            window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, "Different Views Minimal Example")
-            window.show_view(GameOverView())
-        elif self.player_sprite2.health <= 0:
-            window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, "Different Views Minimal Example")
-            window.show_view(GameOverView())
-
-        # print("player 1:: ", self.player_sprite1.texture.hit_box_points)
-        # print("player 2:: ", self.player_sprite2.texture.hit_box_points)
-
-    def update_animation(self, delta_time: float = 1 / 5):
-            # print(self.player_sprite1.state_number)
-            # check for player 1
-            if(self.player_sprite1.state == "idle"):
-                #4 * 7
-                if(self.player_sprite1.state_number >= 28):
-                    self.player_sprite1.state_number = 0
-                self.player_sprite1.texture = self.player_sprite1.idle_textures[int(self.player_sprite1.state_number / 7)][1- self.player_sprite1.facing_direction]
-                self.player_sprite1.state_number += 1
-            if(self.player_sprite2.state == "idle"):
-                if(self.player_sprite2.state_number >= 28):
-                    self.player_sprite2.state_number = 0
-                self.player_sprite2.texture = self.player_sprite2.idle_textures[int(self.player_sprite2.state_number / 7)][1 - self.player_sprite2.facing_direction]
-                self.player_sprite2.state_number += 1
-            if(self.player_sprite1.state == "attack"):
-                if(self.player_sprite1.state_number >= 18):
-                    self.player_sprite1.state_number = 0
-                    self.player_sprite1.state = "idle"
-                else:
-                    self.player_sprite1.texture = self.player_sprite1.attack_textures[int(self.player_sprite1.state_number / 3)][1 - self.player_sprite1.facing_direction]
-                    self.player_sprite1.state_number += 1
-            if(self.player_sprite2.state == "attack"):
-                if(self.player_sprite2.state_number >= 18):
-                    self.player_sprite2.state_number = 0
-                    self.player_sprite2.state = "idle"
-                else:
-                    self.player_sprite2.texture = self.player_sprite2.attack_textures[int(self.player_sprite2.state_number / 3)][1 - self.player_sprite2.facing_direction]
-                    self.player_sprite2.state_number += 1
-            if(self.player_sprite1.state == "jump"):
-                if(self.player_sprite1.state_number):
-                    self.player_sprite1.texture = self.player_sprite1.jump_textures[1][1 - self.player_sprite2.facing_direction]
-                if(self.physics_engine.is_on_ground(self.player_sprite1)):
-                    self.player_sprite1.state = "idle"
-            if(self.player_sprite2.state == "jump"):
-                if(self.player_sprite2.state_number):
-                    self.player_sprite2.texture = self.player_sprite2.jump_textures[1][1 - self.player_sprite2.facing_direction]
-                if(self.physics_engine.is_on_ground(self.player_sprite2)):
-                    self.player_sprite2.state = "idle"
-                         
 
         # to visualize hit box
         # self.player_sprite1.draw_hit_box()
@@ -586,8 +444,12 @@ class MyGame(arcade.View):
                     self.player_sprite1.state_number = 0
                 self.player_sprite1.texture = self.player_sprite1.idle_textures[int(self.player_sprite1.state_number / 7)][self.player_sprite2.facing_direction]
                 self.player_sprite1.state_number += 1
-            
-            elif(self.player_sprite1.state == "attack"):
+            if(self.player_sprite2.state == "idle"):
+                if(self.player_sprite2.state_number >= 28):
+                    self.player_sprite2.state_number = 0
+                self.player_sprite2.texture = self.player_sprite2.idle_textures[int(self.player_sprite2.state_number / 7)][1 - self.player_sprite2.facing_direction]
+                self.player_sprite2.state_number += 1
+            if(self.player_sprite1.state == "attack"):
                 if(self.player_sprite1.state_number >= TOTAL_ATTACK_FRAME):
                     self.player_sprite1.state_number = 0
                     self.player_sprite1.state = "idle"
@@ -596,29 +458,7 @@ class MyGame(arcade.View):
                     # self.player_sprite1.texture = self.player_sprite1.(attack_textures if self.player_sprite1.attack_state == 0 else )[find_attack_index1][self.player_sprite2.facing_direction]
                     self.player_sprite1.texture = (self.player_sprite1.attack_textures[find_attack_index1][self.player_sprite2.facing_direction] if self.player_sprite1.attack_state == 0 else self.player_sprite1.attack2_textures[find_attack_index1][self.player_sprite2.facing_direction])
                     self.player_sprite1.state_number += 1
-
-            elif(self.player_sprite1.state == "jump"):
-                # if(self.player_sprite1.state_number):
-                self.player_sprite1.texture = self.player_sprite1.jump_textures[1][1 - self.player_sprite1.facing_direction]
-                if(self.physics_engine.is_on_ground(self.player_sprite1)):
-                    self.player_sprite1.state = "idle"
-
-            elif(self.player_sprite1.state == "hurt"):
-                if(self.player_sprite1.state_number == hurt_frame[-1]):
-                    self.player_sprite1.state = "idle"
-                    self.player_sprite1.state_number = 0
-                else:
-                    find_hurt_index1 = find_index(hurt_frame, self.player_sprite1.state_number)
-                    self.player_sprite1.texture = (self.player_sprite1.hurt_textures[find_hurt_index1][self.player_sprite2.facing_direction])
-                    self.player_sprite1.state_number += 1
-            
-            if(self.player_sprite2.state == "idle"):
-                if(self.player_sprite2.state_number >= 28):
-                    self.player_sprite2.state_number = 0
-                self.player_sprite2.texture = self.player_sprite2.idle_textures[int(self.player_sprite2.state_number / 7)][1 - self.player_sprite2.facing_direction]
-                self.player_sprite2.state_number += 1
-            
-            elif(self.player_sprite2.state == "attack"):
+            if(self.player_sprite2.state == "attack"):
                 if(self.player_sprite2.state_number >= TOTAL_ATTACK_FRAME):
                     self.player_sprite2.state_number = 0
                     self.player_sprite2.state = "idle"
@@ -627,16 +467,27 @@ class MyGame(arcade.View):
                     # self.player_sprite2.texture = self.player_sprite2.attack_textures[find_attack_index2][1 - self.player_sprite2.facing_direction]
                     self.player_sprite2.texture = (self.player_sprite2.attack_textures[find_attack_index2][self.player_sprite1.facing_direction] if self.player_sprite2.attack_state == 0 else self.player_sprite2.attack2_textures[find_attack_index2][self.player_sprite1.facing_direction])
                     self.player_sprite2.state_number += 1
-            
-            elif(self.player_sprite2.state == "jump"):
+            if(self.player_sprite1.state == "jump"):
+                # if(self.player_sprite1.state_number):
+                self.player_sprite1.texture = self.player_sprite1.jump_textures[1][1 - self.player_sprite1.facing_direction]
+                if(self.physics_engine.is_on_ground(self.player_sprite1)):
+                    self.player_sprite1.state = "idle"
+            if(self.player_sprite2.state == "jump"):
                 # if(self.player_sprite2.state_number):
                 self.player_sprite2.texture = self.player_sprite2.jump_textures[1][1 - self.player_sprite2.facing_direction]
                 if(self.physics_engine.is_on_ground(self.player_sprite2)):
                     self.player_sprite2.state = "idle"
 
-            
+            if(self.player_sprite1.state == "hurt"):
+                if(self.player_sprite1.state_number == hurt_frame[-1]):
+                    self.player_sprite1.state = "idle"
+                    self.player_sprite1.state_number = 0
+                else:
+                    find_hurt_index1 = find_index(hurt_frame, self.player_sprite1.state_number)
+                    self.player_sprite1.texture = (self.player_sprite1.hurt_textures[find_hurt_index1][self.player_sprite2.facing_direction])
+                    self.player_sprite1.state_number += 1
 
-            elif(self.player_sprite2.state == "hurt"):
+            if(self.player_sprite2.state == "hurt"):
                 if(self.player_sprite2.state_number == hurt_frame[-1]):
                     self.player_sprite2.state = "idle"
                     self.player_sprite2.state_number = 0
